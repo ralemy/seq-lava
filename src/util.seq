@@ -1,0 +1,27 @@
+import time
+import gzip
+import pickle
+
+type REF_KMER(kmer: int, name: int, index: int, repeat: int)
+type SNP_KMER(kmer:int, name: int, index: int, pos:int, ref_freq: int, alt_freq:int, repeat: int)
+type KM = Kmer[32]
+
+
+last_time = time.time()
+def log(msg: str):
+    if True:
+        print time.time() - last_time, msg
+
+def save_pickle[T](obj: T, file_name:str):
+    with gzip.open(file_name + '.pickle', 'wb') as f:
+        pickle.dump(obj, f)
+
+def load_pickle[T](file_name: str) -> T:
+    with gzip.open(file_name + '.pickle', 'rb') as f:
+        return pickle.load[T](f)
+
+def encode_position(pos: int, base: str, alt:str) -> int:
+    return ((pos << 16) | (ord(base) << 8) | ord(alt))
+
+def decode_position(pos:int) -> tuple[int, str, str]:
+    return (((pos >> 16) & 0x0000ff), chr((pos >> 8) & 0x0000ff), chr(pos & 0x0000ff))

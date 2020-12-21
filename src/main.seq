@@ -1,0 +1,46 @@
+import sys
+import pickle
+import gzip
+
+from prep import prep
+from genotype import genotype
+
+
+snp_filename = "./data/chr1_snp.txt"
+ref_filename = "./data/chr1.fa"
+reads_filename = "./data/SRR622461.filt.fastq.gz"
+out_snp = "./output/out_snp"
+out_ref = "./output/out_ref"
+out_genotype = "./output/out_geotype"
+
+command = 'lava'
+
+if len(sys.argv) > 1:
+    command = sys.argv[1]
+
+if command == 'dict':
+    if len(sys.argv) > 2:
+        snp_filename = sys.argv[2]
+    if len(sys.argv) > 3:
+        ref_filename = sys.argv[3]
+    if len(sys.argv) > 4:
+        out_snp = sys.argv[4]
+    if len(sys.argv) > 5:
+        out_ref = sys.argv[5]
+    prep(snp_filename, ref_filename, out_snp, out_ref)
+
+
+elif command == 'lava':
+    if len(sys.argv) > 2:
+        out_snp = sys.argv[2]
+    if len(sys.argv) > 3:
+        out_ref = sys.argv[3]
+    if len(sys.argv) > 4:
+        reads_filename = sys.argv[4]
+    if len(sys.argv) > 5:
+        out_genotype = sys.argv[5]
+    genotype(out_snp, out_ref,reads_filename, out_genotype)
+
+else:
+    print 'lava.seq dict snp-reference fasta-reference snp-dict-out ref-dict-out'
+    print 'lava.seq lava snp-dict ref-dict fastq-reads genotype-output'
