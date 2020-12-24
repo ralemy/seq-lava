@@ -2,8 +2,17 @@ import time
 import gzip
 import pickle
 
-type REF_KMER(kmer: int, name: int, index: int, repeat: int)
-type SNP_KMER(kmer:int, name: int, index: int, pos:int, ref_freq: int, alt_freq:int, repeat: int)
+type REF_KMER(kmer: int, index: int, repeat: int):
+    def serialize(self:REF_KMER, repeat:int) -> str:
+        return '|'.join([str(x) for x in [self.kmer, self.index]]) + '|' + str(repeat)
+    def serialize_ambig(self:REF_KMER) -> str:
+        return str(self.index)
+type SNP_KMER(kmer:int, index: int, pos:int, ref_freq: int, alt_freq:int, repeat: int):
+    def serialize(self:SNP_KMER, repeat:int)-> str:
+        return '|'.join([str(x) for x in [self.kmer, self.index, self.pos, self.ref_freq, self.alt_freq]]) + '|' + str(repeat)
+    def serialize_ambig(self:SNP_KMER) -> str:
+        return "^".join([str(x) for x in [self.index, self.pos, self.ref_freq, self.alt_freq]])
+
 type KM = Kmer[32]
 
 

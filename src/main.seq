@@ -5,12 +5,19 @@ import gzip
 from prep import prep
 from genotype import genotype
 
-
-snp_filename = "./data/chr1_snp.txt"
-ref_filename = "./data/chr1.fa"
-reads_filename = "./data/SRR622461.filt.fastq.gz"
+small_files = True
+snp_filename = "./data/Affymetrix_6_SNPs.txt"
+ref_filename = "./data/hg19.fa.gz"
 out_snp = "./output/out_snp"
 out_ref = "./output/out_ref"
+
+if small_files:
+    snp_filename = "./data/chr1_snp.txt"
+    ref_filename = "./data/chr1.fa"
+    out_snp = "./output/out_snp_chr1"
+    out_ref = "./output/out_ref_chr1"
+
+reads_filename = "./data/SRR622461.filt.fastq.gz"
 out_genotype = "./output/out_geotype"
 
 command = 'lava'

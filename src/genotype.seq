@@ -26,12 +26,7 @@ def jumpgate_factory[T](kmers: list[T]) -> list[int]:
     jumpgate = list[int](JUMP_MASK_LO)
     jumpgate.append(0)
     size = len(kmers) - 1
-    max_name = -1
-    max_index = -1
     for index, member in enumerate(kmers):
-        if member.name > max_name or member.index > max_index:
-            max_name = member.name
-            max_index = member.index
         hi = hi(member.kmer)
         while(hi >= len(jumpgate)):
             jumpgate.append(index)
@@ -70,7 +65,7 @@ def neighbor_with_pos[T](kmer: T) -> tuple[int, T]:
 
 
 type IndexTableEntry = dict[int,int]
-type KmerContext(kmer:int, position: int, name: int, index: int)
+type KmerContext(kmer:int, position: int, index: int)
 type Call(genotype: int, confidence: float)
 type CacheStruct(g0:float, g1:float, g2:float)
 
@@ -83,7 +78,8 @@ class IndexTable:
         self.best_is_ambig = False
         self.entries = dict[int,IndexTableEntry]()
 
-    def clear_index(self:IndexTable, name:int, index:int):
+    def clear_index(self:IndexTable, index:int):
+        name = 0
         if name in self.entries:
             if index in self.entries[name]:
                 self.entries[name][index] = 0
@@ -91,15 +87,17 @@ class IndexTable:
     def clear(self:IndexTable):
         self.entries.clear()
 
-    def add(self:IndexTable, name: int, index: int):
+    def add(self:IndexTable, index: int):
+        name = 0
         if name not in self.entries:
             self.entries[name] = IndexTableEntry()
         if index not in self.entries[name]:
             self.entries[name][index] = 0
         self.entries[name][index] += 1
-        self.set_best(name, index, self.entries[name][index])
+        self.set_best(index, self.entries[name][index])
 
-    def set_best(self:IndexTable, name, index: int, freq: int):
+    def set_best(self:IndexTable, index: int, freq: int):
+        name = 0
         if self.best[2] < freq:
             self.best = (name, index, freq)
             self.best_is_ambig = False
@@ -163,11 +161,12 @@ class Genotype:
     def pileup(self:Genotype):
         for snp in self.snp_kmers:
             if snp.repeat == 0:
-                if snp.name not in self.pileup_table:
-                    self.pileup_table[snp.name] = dict[int, PileupEntry]()
-                self.pileup_table[snp.name][snp.index] = PileupEntry(snp)
+                if 0 not in self.pileup_table:
+                    self.pileup_table[0] = dict[int, PileupEntry]()
+                self.pileup_table[0][snp.index] = PileupEntry(snp)
 
-    def get_pileup_entry(self: Genotype, name: int, index: int):
+    def get_pileup_entry(self: Genotype, index: int):
+        name = 0 
         if name in self.pileup_table:
             if index in self.pileup_table[name]:
                 return self.pileup_table[name][index]
@@ -194,13 +193,13 @@ class Genotype:
         k = kmers[hit]
         if k.repeat == 0:
             read_pos = k.index - offset
-            contexts.append(KmerContext(kmer, read_pos, k.name, k.index))
-            self.index_table.add(k.name, read_pos)
+            contexts.append(KmerContext(kmer, read_pos, k.index))
+            self.index_table.add(read_pos)
         elif k.repeat < 10:
             for ref in ambig[kmer]:
                 read_pos = ref.index - offset
-                contexts.append(KmerContext(kmer,read_pos, ref.name, ref.index))
-                self.index_table.add(ref.name, read_pos)
+                contexts.append(KmerContext(kmer,read_pos,ref.index))
+                self.index_table.add(read_pos)
 
     def store_hits(self:Genotype, kmer:int, ref_hit:int, snp_hit:int, offset:int):
         if ref_hit > -1:
@@ -222,15 +221,15 @@ class Genotype:
 
     def update_counts(self: Genotype, context:KmerContext):
         for p, b in enumerate(str(KM(context.kmer))):
-            entry = self.get_pileup_entry(context.name, p + context.index)
+            entry = self.get_pileup_entry(p + context.index)
             if entry.ref == b:
                 entry.ref_cnt += (1 if entry.ref_cnt < MAX_COV else 0)
             elif entry.alt == b:
                 entry.alt_cnt += (1 if entry.ref_cnt < MAX_COV else 0)
 
     def update_table(self:Genotype, context: KmerContext, process_read:bool, target_index:tuple[int,int]):
-        self.index_table.clear_index(context.name, context.position)
-        if process_read and (context.name == target_index[0] and context.position == target_index[1]):
+        self.index_table.clear_index(context.position)
+        if process_read and context.position == target_index[1]:
             self.update_counts(context)
 
     def update_pileup(self:Genotype):
