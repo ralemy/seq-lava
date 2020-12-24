@@ -186,14 +186,8 @@ def increment(c:MER_COUNTER, repeat: int):
         c.total_ambig += repeat+1
         c.overflow += (1 if repeat > MAX_AMBIG else 0)
 
-# def commit_ref(ref: REF_KMER, repeat: int, kmers: list[REF_KMER], c: MER_COUNTER):
-#     kmers.append(REF_KMER(ref.kmer, ref.index, repeat))
-#     increment(c,repeat)
-
-def commit[T](mer: T, repeat: int, c: MER_COUNTER, kfile:File, ambig_file:File, ambig:list[T]):
-    kfile.write(mer.serialize(repeat) + '\n')
-    if repeat > 0:
-        ambig_file.write(str(mer.kmer) + '|' + str([am.serialize_ambig for am in ambig]) + '\n')
+def commit_ref(ref: REF_KMER, repeat: int, kmers: list[REF_KMER], c: MER_COUNTER):
+    kmers.append(REF_KMER(ref.kmer, ref.index, repeat))
     increment(c,repeat)
 
 def commit_snp(ref: SNP_KMER, repeat: int, kmers: list[SNP_KMER], c: MER_COUNTER):
@@ -210,67 +204,35 @@ def report_mer_counters(total_kmers: int, counters:MER_COUNTER):
 
 def dict_factory[T](array: list[T],
     out_file: str,
-    init_mer:T):
+    init_mer:T,
+    commitfn: function[void,T,int,list[T],MER_COUNTER]) -> tuple[list[T], dict[int, list[T]]]:
     total_kmers = 0
     counters=MER_COUNTER(0,0,0,0)
     last_mer = init_mer
     last_repeat = -1
-    with open(out_file + '.txt', 'w') as kfile:
-        with open(out_file+ '_ambig.txt', 'w') as ambig_file:
-            ambig = list[T]()
-            for mer in array:
-                ambig = list[T]()
-                total_kmers += 1
-                if last_repeat == -1:
-                    last_mer = mer
-                    last_repeat = 0
-                elif mer.kmer != last_mer.kmer:
-                    commit(last_mer, last_repeat, counters, kfile, ambig_file, ambig)
-                    last_mer = mer
-                    last_repeat = 0
-                elif last_repeat == 0:
-                    ambig.append(last_mer)
-                    last_ref = mer
-                    last_repeat = 1
-                else:
-                    if len(ambig) < MAX_AMBIG:
-                        ambig.append(last_mer)
-                    last_ref = mer
-                    last_repeat += 1
-            commit(last_mer, last_repeat, counters, kfile, ambig_file, ambig)
+    ambig = dict[int, list[T]]()
+    kmers = list[T](len(array))
+    for mer in array:
+        total_kmers += 1
+        if last_repeat == -1:
+            last_mer = mer
+            last_repeat = 0
+        elif mer.kmer != last_mer.kmer:
+            commitfn(last_mer, last_repeat, kmers, counters)
+            last_mer = mer
+            last_repeat = 0
+        elif last_repeat == 0:
+            ambig[mer.kmer] = [last_mer]
+            last_ref = mer
+            last_repeat = 1
+        else:
+            if len(ambig[mer.kmer]) < MAX_AMBIG:
+                ambig[mer.kmer].append(last_mer)
+            last_ref = mer
+            last_repeat += 1
+    commitfn(last_mer, last_repeat, kmers, counters)
     report_mer_counters(total_kmers, counters)
-
-# def old_dict_factory[T](array: list[T],
-#     out_file: str,
-#     init_mer:T,
-#     commitfn: function[void,T,int,list[T],MER_COUNTER]) -> tuple[list[T], dict[int, list[T]]]:
-#     total_kmers = 0
-#     counters=MER_COUNTER(0,0,0,0)
-#     last_mer = init_mer
-#     last_repeat = -1
-#     ambig = dict[int, list[T]]()
-#     kmers = list[T](len(array))
-#     for mer in array:
-#         total_kmers += 1
-#         if last_repeat == -1:
-#             last_mer = mer
-#             last_repeat = 0
-#         elif mer.kmer != last_mer.kmer:
-#             commitfn(last_mer, last_repeat, kmers, counters)
-#             last_mer = mer
-#             last_repeat = 0
-#         elif last_repeat == 0:
-#             ambig[mer.kmer] = [last_mer]
-#             last_ref = mer
-#             last_repeat = 1
-#         else:
-#             if len(ambig[mer.kmer]) < MAX_AMBIG:
-#                 ambig[mer.kmer].append(last_mer)
-#             last_ref = mer
-#             last_repeat += 1
-#     commitfn(last_mer, last_repeat, kmers, counters)
-#     report_mer_counters(total_kmers, counters)
-#     return(kmers,ambig)
+    return(kmers,ambig)
 
 def sort_array[T](arr: list[T]) -> list[T]:
     def sortfn(left:T):
@@ -279,13 +241,13 @@ def sort_array[T](arr: list[T]) -> list[T]:
     log('unsorted: ' +str(sz)+ str([arr[0], arr[sz//2], arr[sz-1]]))
 
     arr.sort(key = sortfn, algorithm='pdq' )
-    log('unsorted: ' +str(sz)+ str([arr[0], arr[sz//2], arr[sz-1]]))
+    log('sorted: ' +str(sz)+ str([arr[0], arr[sz//2], arr[sz-1]]))
     return arr
 
 def save_array[T](arr:list[T], ambig:dict[int,list[T]], out_file: str):
-    log ('saving kmer array')
+    log (out_file + ' saving kmer array')
     save_pickle(arr, out_file)
-    log ('saving ambig array')
+    log (out_file + ' saving ambig array')
     save_pickle(ambig, out_file + '_ambig')
 
 
@@ -301,7 +263,7 @@ def prep(snp_filename: str, ref_filename: str, snp_out: str, ref_out: str):
 
     cross.snp_tmp[0] = sort_array(cross.snp_tmp[0])
     log ('SNP sorted............... Building dictionary')
-    dict_factory(cross.snp_tmp[0], snp_out, SNP_KMER(-1,-1,-1,-1,-1,-1))
+    cross.snp_tmp[0], snp_ambig = dict_factory(cross.snp_tmp[0], snp_out, SNP_KMER(-1,-1,-1,-1,-1,-1), commit_snp)
 
     log ('building REF array')
     cross.ref_kmer_array()
@@ -309,10 +271,10 @@ def prep(snp_filename: str, ref_filename: str, snp_out: str, ref_out: str):
     cross.ref_tmp[0] = sort_array(cross.ref_tmp[0])
 
     log ('REF Sorted.............. building dictionaries')
-    dict_factory(cross.ref_tmp[0], ref_out, REF_KMER(-1,-1,-1))
+    cross.ref_tmp[0], ref_ambig = dict_factory(cross.ref_tmp[0], ref_out, REF_KMER(-1,-1,-1), commit_ref)
 
-    # save_array(cross.snp_tmp[0], snp_ambig, snp_out)
-    # save_array(cross.ref_tmp[0], ref_ambig, ref_out)
+    save_array(cross.snp_tmp[0], snp_ambig, snp_out)
+    save_array(cross.ref_tmp[0], ref_ambig, ref_out)
 
     log ('saving chromosome names file')
     save_pickle(cross.chromosomes, ref_out + '_chromosomes')
