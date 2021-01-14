@@ -1,4 +1,4 @@
 *.seq linguist-language=seq
-*.js linguist-detectable=false`
+*.js linguist-vendored
 *.html linguist-detectable=false
 *.xml linguist-detectable=false
